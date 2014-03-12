@@ -37,6 +37,12 @@ idobata hoook endpoint
         summary = ticket['summary']
         link = self.env.abs_href.ticket(ticket.id)
         author = self.obfuscate_email(author)
-        message = u"[{event}]<a href="{link}">{id}:{summary}</a><br/>".format(event=event,author=author,id=id,summary=summary,link=link)
-        params=urllib.urlencode({'source':message.encode('utf-8')})
-	      urllib.urlopen(url,params)
+        message = u"[{event}]<a href='{link}'>{id}:{summary}</a><br/>".format(event=event,author=author,id=id,summary=summary,link=link)
+        params=urllib.urlencode({'source':message.encode('utf-8'),'format':'html'})
+	urllib.urlopen(self.endpoint,params)
+    
+    def obfuscate_email(self, text):
+        if self.env.config.getbool('trac', 'show_email_addresses'):
+            return text
+        else:
+            return obfuscate_email_address(text)
