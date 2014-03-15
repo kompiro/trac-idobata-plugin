@@ -3,6 +3,7 @@ from trac.core import *
 from trac.ticket.model import Ticket
 from trac.ticket.api import ITicketChangeListener
 from trac.wiki.api import IWikiChangeListener
+from trac.wiki.formatter import format_to_html
 from trac.config import *
 
 import urllib
@@ -29,7 +30,9 @@ idobata hoook endpoint
         id = ticket.id
         summary = ticket['summary']
         link = self.env.abs_href.ticket(ticket.id)
-        message = u"<span class='label label-{event_class}'>TICKET:{event}</span><a href='{link}'>{id}:{summary}</a>".format(event=event,event_class=event_class,id=id,summary=summary,link=link)
+        message = u"""<span class='label label-{event_class}'>&nbsp;TICKET:{event}</span><a href='{link}'>{id}:{summary}</a>
+"""
+        message = message.format(event=event,event_class=event_class,id=id,summary=summary,link=link,desc=desc)
         self._do_post(message)
         return
 
@@ -61,14 +64,16 @@ idobata hoook endpoint
     def wiki_page_renamed(page, old_name):
         name = page.name
         link = self.env.abs_href.wiki(name)
-        message = u"<span class='label label-warn'>WIKI:RENAME</span>{old_name}-><a href='{link}'>{name}</a>".format(event=event,link=link,old_name=old_name,name=name)
+        message = u"""<span class='label label-warn'>&nbsp;WIKI:RENAME</span>{old_name}-><a href='{link}'>{name}</a>"""
+        message = message.format(event=event,link=link,old_name=old_name,name=name)
         self._do_post(message)
         return
 
     def _post_wiki_hook(self,event,page):
         name = page.name
         link = self.env.abs_href.wiki(name)
-        message = u"<span class='label label-success'>WIKI:{event}</span><a href='{link}'>{name}</a>".format(event=event,link=link,name=name)
+        message = u"""<span class='label label-success'>&nbsp;WIKI:{event}</span><a href='{link}'>{name}</a>"""
+        message = message.format(event=event,link=link,name=name)
         self._do_post(message)
         return
 
