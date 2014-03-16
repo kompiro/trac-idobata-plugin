@@ -9,6 +9,8 @@ from trac.test import Mock,MockPerm
 from trac.web.href import Href
 from trac.mimeview import Context
 from trac.wiki.formatter import HtmlFormatter
+from trac.util.text import exception_to_unicode
+from trac.util.text import obfuscate_email_address
 
 import urllib
 
@@ -28,18 +30,35 @@ idobata hoook endpoint
         return
 
     def ticket_changed(self,ticket, comment, author, old_values):
+        id = ticket.id
+        summary = ticket['summary']
+        author = self.obfuscate_email(author)
+        comment = self.wiki_to_html(id,comment)
+        link = self.env.abs_href.ticket(id)
+        status = ticket['status']
+        message = u"""<a href='{link}'>#{id}&nbsp;:&nbsp;{summary}</a>&nbsp;<span class='label label-info'>{status}</span>&nbsp; by {author}
+<p>
+{comment}
+</p>
+"""
+        message = message.format(id=id,summary=summary,link=link,comment=comment,author=author,status=status)
+        self._do_post(message)
         return
 
     def _post_ticket_hook(self,event,event_class,ticket):
         id = ticket.id
         summary = ticket['summary']
         desc = ticket['description']
-        desc = self.wiki_to_html('ticket', ticket.id, desc)
-        link = self.env.abs_href.ticket(ticket.id)
-        message = u"""<span class='label label-{event_class}'>TICKET:{event}</span>&nbsp;<a href='{link}'>{id}:{summary}</a>
+        reporter = ticket['reporter']
+        reporter = self.obfuscate_email(reporter)
+        desc = self.wiki_to_html(id, desc)
+        link = self.env.abs_href.ticket(id)
+        message = u"""<a href='{link}'>#{id}&nbsp;:&nbsp;{summary}</a>&nbsp;<span class='label label-{event_class}'>{event}</span> by {reporter}
+<p>
 {desc}
+</p>
 """
-        message = message.format(event=event,event_class=event_class,id=id,summary=summary,link=link,desc=desc)
+        message = message.format(event=event,event_class=event_class,id=id,summary=summary,link=link,desc=desc,reporter=reporter)
         self._do_post(message)
         return
 
@@ -48,7 +67,7 @@ idobata hoook endpoint
 	urllib.urlopen(self.endpoint,params)
         return
 
-    def wiki_to_html(self, realm, id, wikitext):
+    def wiki_to_html(self, id, wikitext):
         if wikitext is None:
             return ""
         try:
@@ -63,7 +82,7 @@ idobata hoook endpoint
                 ),
                 args={}
             )
-            context = Context.from_request(req, realm, id)
+            context = Context.from_request(req, 'ticket', id)
             formatter = HtmlFormatter(self.env, context, wikitext)
             return formatter.generate(True)
         except Exception, e:
@@ -71,6 +90,12 @@ idobata hoook endpoint
             self.log.error("Failed to render %s", repr(wikitext))
             self.log.error(exception_to_unicode(e, traceback=True))
             return wikitext
+
+    def obfuscate_email(self, text):
+        if self.env.config.getbool('trac', 'show_email_addresses'):
+            return text
+        else:
+            return obfuscate_email_address(text)
 
 class WikiNotification(Component):
     implements(IWikiChangeListener)
@@ -83,20 +108,23 @@ idobata hoook endpoint
         self._post_wiki_hook('CREATED',page)
         return
 
-    def wiki_page_changed(page, version, t, comment, author, ipnr):
+    def wiki_page_changed(self,page, version, t, comment, author, ipnr):
+        self._post_wiki_hook('Update',page)
         return
 
-    def wiki_page_deleted(page):
+    def wiki_page_deleted(self,page):
+        self._post_wiki_hook('DELETE',page)
         return
 
-    def wiki_page_version_deleted(page):
+    def wiki_page_version_deleted(self,page):
+        self._post_wiki_hook('Delete version',page)
         return
 
-    def wiki_page_renamed(page, old_name):
+    def wiki_page_renamed(self,page, old_name):
         name = page.name
         link = self.env.abs_href.wiki(name)
-        message = u"""<span class='label label-warn'>WIKI:RENAME</span>&nbsp;{old_name}-><a href='{link}'>{name}</a>"""
-        message = message.format(event=event,link=link,old_name=old_name,name=name)
+        message = u"""<a href='{link}'>wiki:{name}</a>&nbsp;<span class='label label-info'>RENAME</span> from {old_name}"""
+        message = message.format(link=link,old_name=old_name,name=name)
         self._do_post(message)
         return
 
@@ -105,8 +133,10 @@ idobata hoook endpoint
         link = self.env.abs_href.wiki(name)
         text = page.text
         text = self.wiki_to_html(name,text)
-        message = u"""<span class='label label-success'>WIKI:{event}</span>&nbsp;<a href='{link}'>{name}</a>
+        message = u"""<a href='{link}'>wiki:{name}</a>&nbsp;<span class='label label-success'>{event}</span>
+<p>
 {text}
+</p>
 """
         message = message.format(event=event,link=link,name=name,text=text)
         self._do_post(message)
@@ -117,7 +147,7 @@ idobata hoook endpoint
 	urllib.urlopen(self.endpoint,params)
         return
     
-    def wiki_to_html(self, name , wikitext):
+    def wiki_to_html(self, name, wikitext):
         if wikitext is None:
             return ""
         try:
