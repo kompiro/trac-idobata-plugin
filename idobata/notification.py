@@ -64,7 +64,7 @@ idobata hoook endpoint
 
     def _do_post(self,message):
         params=urllib.urlencode({'source':message.encode('utf-8'),'format':'html'})
-	urllib.urlopen(self.endpoint,params)
+        urllib.urlopen(self.endpoint,params)
         return
 
     def wiki_to_html(self, id, wikitext):
@@ -101,8 +101,9 @@ class WikiNotification(Component):
     implements(IWikiChangeListener)
 
     endpoint = Option('idobata','endpoint','https://idobata.io/hook/XXX',"""
-idobata hoook endpoint
+idobata hook endpoint
 """)
+    wiki_detail = BoolOption('idobata','wiki_detail',True,"show wiki's detail information")
 
     def wiki_page_added(self,page):
         self._post_wiki_hook('CREATED',page)
@@ -132,21 +133,31 @@ idobata hoook endpoint
         name = page.name
         link = self.env.abs_href.wiki(name)
         text = page.text
-        text = self.wiki_to_html(name,text)
-        message = u"""<a href='{link}'>wiki:{name}</a>&nbsp;<span class='label label-success'>{event}</span>
+        
+        if self.wiki_detail:
+            text = page.text
+            text = self.wiki_to_html(name,text)
+            message = u"""<a href='{link}'>wiki:{name}</a>&nbsp;<span class='label label-success'>{event}</span>
 <p>
 {text}
 </p>
 """
-        message = message.format(event=event,link=link,name=name,text=text)
-        self._do_post(message)
-        return
+            message = message.format(event=event,link=link,name=name,text=text)
+            self._do_post(message)
+            return
+        else:
+            version = page.version
+            old_version = version - 1
+            message = "<a href='{link}?action=diff&version={version}&old_version={old_version}'>Wiki:{name} is changed. version:{version}</a>&nbsp;<span class='label label-success'>{event}</span>"
+            message = message.format(event=event,link=link,name=name,version=version,old_version=old_version)
+            self._do_post(message)
+            return
 
     def _do_post(self,message):
         params=urllib.urlencode({'source':message.encode('utf-8'),'format':'html'})
-	urllib.urlopen(self.endpoint,params)
+        urllib.urlopen(self.endpoint,params)
         return
-    
+
     def wiki_to_html(self, name, wikitext):
         if wikitext is None:
             return ""
