@@ -148,7 +148,7 @@ idobata hook endpoint
         else:
             version = page.version
             old_version = version - 1
-            message = "<a href='{link}?action=diff&version={version}&old_version={old_version}'>Wiki:{name} is changed. version:{version}</a>&nbsp;<span class='label label-success'>{event}</span>"
+            message = u"<a href='{link}?action=diff&version={version}&old_version={old_version}'>Wiki:{name} is changed. version:{version}</a>&nbsp;<span class='label label-success'>{event}</span>"
             message = message.format(event=event,link=link,name=name,version=version,old_version=old_version)
             self._do_post(message)
             return
